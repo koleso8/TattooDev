@@ -1,4 +1,11 @@
 require('dotenv').config();
+
+import Replicate from "replicate";
+
+const replicate = new Replicate({
+    auth: process.env.REPLICATE_API_TOKEN,
+});
+
 const { Telegraf } = require('telegraf');
 const axios = require('axios');
 
@@ -21,59 +28,22 @@ const bot = new Telegraf(TELEGRAM_TOKEN);
 // Функция для генерации изображения через Replicate
 async function generateImage(prompt) {
     try {
-        const fullPrompt = BASE_PROMPT + prompt;
-        console.log(`Full prompt: ${fullPrompt}`);
-
         // Отправляем запрос на генерацию
-        const response = await axios.post(
-            'https://api.replicate.com/v1/predictions',
-            {
-                version: 'stability-ai/stable-diffusion:27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd5d',
-                input: {
-                    prompt: fullPrompt,
-                    width: 512,  // Заменяем image_dimensions на width и height
-                    height: 512,
-                    num_outputs: 1,
-                    num_inference_steps: 50,
-                    guidance_scale: 7.5,
-                    scheduler: 'K_EULER',  // Добавляем scheduler, как в документации
-                },
-            },
-            {
-                headers: {
-                    Authorization: `Token ${REPLICATE_API_TOKEN}`,
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
 
-        const predictionId = response.data.id;
-        console.log(`Prediction ID: ${predictionId}`);
+        const input = {
+            raw: false,
+            prompt: BASE_PROMPT + prompt,
+            aspect_ratio: "3:2",
+            output_format: "jpg",
+            safety_tolerance: 2,
+            image_prompt_strength: 0.1
+        };
+        const response = await replicate.run("black-forest-labs/flux-1.1-pro-ultra", { input });
 
-        // Ждём, пока изображение сгенерируется
-        while (true) {
-            const statusResponse = await axios.get(
-                `https://api.replicate.com/v1/predictions/${predictionId}`,
-                {
-                    headers: {
-                        Authorization: `Token ${REPLICATE_API_TOKEN}`,
-                    },
-                }
-            );
+        return response.url()
 
-            const status = statusResponse.data;
-            console.log(`Status: ${status.status}`);
-
-            if (status.status === 'succeeded') {
-                return status.output[0]; // URL изображения
-            } else if (status.status === 'failed') {
-                throw new Error(`Failed to generate image: ${JSON.stringify(status.error)}`);
-            }
-            // Задержка перед следующим запросом
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-        }
     } catch (error) {
-        console.error('Error generating image:', error.response ? JSON.stringify(error.response.data) : error.message);
+        console.error('Error generating image:', error.message);
         return null;
     }
 }
@@ -93,7 +63,7 @@ bot.on('text', async (ctx) => {
     if (imageUrl) {
         await ctx.replyWithPhoto(imageUrl);
     } else {
-        await ctx.reply('Что-то пошло не так, попробуй снова! Проверь логи на Render.com для подробностей.');
+        await ctx.reply('Что-то пошло не так, попробуй снова!');
     }
 });
 
