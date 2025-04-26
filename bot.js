@@ -21,16 +21,22 @@ const bot = new Telegraf(TELEGRAM_TOKEN);
 // Функция для генерации изображения через Replicate
 async function generateImage(prompt) {
     try {
+        const fullPrompt = BASE_PROMPT + prompt;
+        console.log(`Full prompt: ${fullPrompt}`);
+
         // Отправляем запрос на генерацию
         const response = await axios.post(
             'https://api.replicate.com/v1/predictions',
             {
-                version: 'stability-ai/stable-diffusion:db21e45d3f7023abc2a46ee38a23973f6dce16bb082a930b0c49861f96d1e5',
+                version: 'stability-ai/stable-diffusion:27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd5d',
                 input: {
-                    prompt: BASE_PROMPT + prompt,
+                    prompt: fullPrompt,
+                    width: 512,  // Заменяем image_dimensions на width и height
+                    height: 512,
                     num_outputs: 1,
                     num_inference_steps: 50,
                     guidance_scale: 7.5,
+                    scheduler: 'K_EULER',  // Добавляем scheduler, как в документации
                 },
             },
             {
@@ -42,6 +48,7 @@ async function generateImage(prompt) {
         );
 
         const predictionId = response.data.id;
+        console.log(`Prediction ID: ${predictionId}`);
 
         // Ждём, пока изображение сгенерируется
         while (true) {
@@ -55,16 +62,18 @@ async function generateImage(prompt) {
             );
 
             const status = statusResponse.data;
+            console.log(`Status: ${status.status}`);
+
             if (status.status === 'succeeded') {
                 return status.output[0]; // URL изображения
             } else if (status.status === 'failed') {
-                throw new Error('Failed to generate image');
+                throw new Error(`Failed to generate image: ${JSON.stringify(status.error)}`);
             }
             // Задержка перед следующим запросом
             await new Promise((resolve) => setTimeout(resolve, 2000));
         }
     } catch (error) {
-        console.error('Error generating image:', error.message);
+        console.error('Error generating image:', error.response ? JSON.stringify(error.response.data) : error.message);
         return null;
     }
 }
@@ -84,7 +93,7 @@ bot.on('text', async (ctx) => {
     if (imageUrl) {
         await ctx.replyWithPhoto(imageUrl);
     } else {
-        await ctx.reply('Что-то пошло не так, попробуй снова!');
+        await ctx.reply('Что-то пошло не так, попробуй снова! Проверь логи на Render.com для подробностей.');
     }
 });
 
