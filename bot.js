@@ -1,13 +1,14 @@
-require('dotenv').config();
+import dotenv from 'dotenv';
+import Replicate from 'replicate';
+import { Telegraf } from 'telegraf';
+import express from 'express';
+dotenv.config();
 
-import Replicate from "replicate";
 
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
 
-const { Telegraf } = require('telegraf');
-const axios = require('axios');
 
 // Токены из .env
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
